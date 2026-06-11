@@ -33,7 +33,7 @@ if DEBUG_MODE:
 
 # Title
 
-st.title("AI Code Review Agent + Mentor")
+st.title("AI Code Review Agent UI and features")
 st.markdown("Your AI-powered coding assistant for debugging & learning.")
 st.divider()
 
