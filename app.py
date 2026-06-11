@@ -4,80 +4,103 @@ from utils import ask_gemini
 # Page Config
 
 st.set_page_config(
-    page_title="AI Code Review Agent",
-    layout="wide"
-)
+    page_title="AI Code Review Agent",layout="wide")
 
-# Session State
+st.markdown("""
+<style>
+.stButton > button {
+    height: 55px;
+    border-radius: 12px;
+    font-weight: bold;
+}
+</style>
+""", unsafe_allow_html=True)
+
+DEBUG_MODE = st.sidebar.toggle("Debug Mode",value = True)
+
+# Session state
 
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
-# Main UI
+if "explanation" not in st.session_state:
+    st.session_state.explanation = ""
 
-st.title("AI Code Review Agent + AI Mentor")
+# Debug toggle
 
-code = st.text_area(
-    "Paste your code here",
-    height=300,
-    key="main_code"
+if DEBUG_MODE:
+    st.sidebar.info("Mock Mode ON (NO API CALLS)")
+
+# Title
+
+st.title("AI Code Review Agent + Mentor")
+st.markdown("Your AI-powered coding assistant for debugging & learning.")
+st.divider()
+
+
+uploaded_file = st.file_uploader(
+    "Upload Source Code",
+    type=["py", "cpp", "java", "c"]
 )
 
-difficulty = st.selectbox(
-    "Bug Injection Difficulty",
-    ["Easy", "Medium", "Hard"],
-    key="difficulty"
-)
+if uploaded_file is not None:
 
-# Sidebar AI Mentor
+    code = uploaded_file.read().decode("utf-8")
 
+    st.success("File Uploaded Successfully")
+
+    st.text_area(
+        "Code",
+        value=code,
+        height=250
+    )
+
+else:
+
+    code = st.text_area(
+        "Paste your code here",
+        height=250,
+        key="main_code"
+    )
+
+difficulty = st.selectbox( "Bug Injection Difficulty",["Easy", "Medium", "Hard"],key="difficulty")
+
+if "output" not in st.session_state:
+    st.session_state.output = ""
+
+st.divider()
+
+# Sider ai mentor
+
+st.sidebar.write("DEBUG_MODE =", DEBUG_MODE)
 st.sidebar.title("AI Mentor")
-
-user_question = st.sidebar.text_input(
-    "Ask about any bug, concept, error or output",
-    key="mentor_question"
-)
+user_question = st.sidebar.text_input("Ask anything about code")
 
 if st.sidebar.button("Ask AI"):
 
-    conversation = ""
-
-    for role, msg in st.session_state.chat_history:
-        conversation += f"{role}: {msg}\n"
+    conversation = "\n".join([f"{r}: {m}" for r, m in st.session_state.chat_history])
 
     prompt = f"""
     You are an expert programming mentor.
 
-    Current Code:
+    Code:
     {code}
 
-    Previous Conversation:
+    Conversation:
     {conversation}
 
     User Question:
     {user_question}
 
-    Explain:
-    - Key Idea
-    - Why It Happens
-    - Fix
-    - Real World Analogy
-    - Example
-
-    Keep the explanation beginner friendly.
+    Explain in simple terms with examples.
     """
 
-    answer = ask_gemini(prompt)
+    answer = ask_gemini(prompt, DEBUG_MODE)
 
-    st.session_state.chat_history.append(
-        ("User", user_question)
-    )
+    st.session_state.chat_history.append(("User", user_question))
+    st.session_state.chat_history.append(("AI", answer))
 
-    st.session_state.chat_history.append(
-        ("AI", answer)
-    )
-
-st.sidebar.markdown("---")
+# Chat history
 
 st.sidebar.subheader("Conversation")
 
@@ -86,146 +109,194 @@ for role, msg in st.session_state.chat_history:
     st.sidebar.write(msg)
     st.sidebar.markdown("---")
 
-
-# Quick Learn
+# Quick learning 
 
 st.sidebar.subheader("Quick Learn")
-
 topic = st.sidebar.selectbox(
-    "Choose Topic",
-    [
-        "Time Complexity",
-        "Space Complexity",
-        "Pointers",
-        "Recursion",
-        "Binary Search",
-        "Dynamic Programming",
-        "Segmentation Fault",
-        "Memory Leak",
-        "Arrays",
-        "Linked List"
-    ],
-    key="topic_select"
+    "Choose Topic",["Time Complexity", "Pointers", "Recursion", "Binary Search","Dynamic Programming", "Segmentation Fault", "Memory Leak"]
 )
 
 if st.sidebar.button("Learn Topic"):
 
-    prompt = f"""
-    Teach {topic} to a beginner.
-
-    Include:
-    1. Definition
-    2. Importance
-    3. Example
-    4. Real-world analogy
-    5. Common mistakes
-    6. Interview tips
-
-    Use simple language.
-    """
-
-    answer = ask_gemini(prompt)
-
-    st.sidebar.subheader(topic)
+    prompt = f"Teach {topic} with examples and analogies."
+    answer = ask_gemini(prompt, DEBUG_MODE)
     st.sidebar.write(answer)
 
+# Main action button
 
-# Main Buttons
-
-col1, col2 = st.columns(2)
+st.divider()
+col1, col2, col3 = st.columns(3)
 
 with col1:
-
-    if st.button("Review Code"):
+    if st.button("Review Code",use_container_width = True):
 
         prompt = f"""
-        Review the following code.
+        Review code:
 
-        Find:
-        1. Bugs
-        2. Logic Errors
-        3. Edge Cases
-        4. Complexity Issues
-        5. Best Practices
-
+        Find bugs, errors, edge cases, complexity issues.
         Code:
+
         {code}
         """
+        result = ask_gemini(prompt, DEBUG_MODE)
 
-        result = ask_gemini(prompt)
+        st.session_state.output = f"""
+        #Review Result
 
-        st.subheader("Review Result")
-        st.write(result)
+        {result}
+        """
+
+# inject bugs
 
 with col2:
-
-    if st.button("Inject Bugs"):
+    if st.button("Inject Bugs",use_container_width = True):
 
         prompt = f"""
-        Inject realistic bugs into this code.
+        Inject realistic bugs.
 
         Difficulty: {difficulty}
 
-        Rules:
-        - Keep code compilable if possible
-        - Add logical bugs
-        - Add realistic mistakes
-        - Return only modified code
+        Code:
+        {code}
+        """
+
+        result = ask_gemini(prompt, DEBUG_MODE)
+
+        st.session_state.output = f"""
+
+        # Bug Injected Code
+
+        {result}
+        """
+
+# Explain bug
+
+with col3:
+    if st.button("Explain Bug",use_container_width = True):
+
+        prompt = f"""
+        Explain bugs in code:
+        - Why it happened
+        - Impact
+        - Fix
+        - Real world analogy    
+        Code:
+        {code}
+        """
+
+        result = ask_gemini(prompt, DEBUG_MODE)
+
+        st.session_state["explanation"] = result
+
+        st.session_state.output = f"""
+        # Bug Explanation
+
+        {result}
+        """
+
+# interview questions
+
+col4, col5, col6 = st.columns(3)
+
+with col4:
+    if st.button("Interview Questions",use_container_width = True):
+
+        prompt = f"""
+        Generate interview questions from this code.
+        - Easy Questions
+        - Medium Questions
+        - Hard Questions
+        - Optimization Questions
 
         Code:
         {code}
         """
 
-        result = ask_gemini(prompt)
+        result = ask_gemini(prompt, DEBUG_MODE)
 
-        st.subheader("Bug Injected Code")
-        st.code(result)
+        st.session_state.output = f"""
+        # Interview Questions
 
+        {result}
+        """
 
-# Explain Bug
+# Diagram
 
-if st.button("Explain Bug"):
+with col5:
+    if st.button("Generate Learning Diagram",use_container_width = True):
 
-    prompt = f"""
-    Analyze the code.
+        prompt = f"""
+        Explain code flow with diagram:
 
-    For every bug explain:
+        Code:
+        {code}
+        """
 
-    1. Bug Name
-    2. Why it happened
-    3. Impact
-    4. Fix
-    5. Real-world analogy
-    6. Beginner-friendly explanation
+        result = ask_gemini(prompt, DEBUG_MODE)
+        st.session_state.output = f"""
+        # Learning Diagram
 
-    Code:
-    {code}
-    """
+        {result}
+        """
 
-    result = ask_gemini(prompt)
+# bug difficulty
 
-    st.subheader("Bug Explanation")
-    st.write(result)
+with col6:
+    if st.button("Bug Difficulty",use_container_width = True):
 
+        prompt = f"""
+        Analyze this code.
+        1. Difficulty Score (1-10)
+        2. Complexity Level
+        3. Learning Level
+        4. Common Mistakes
 
-# Learning Diagram
+        Code:
+        {code}
+        """
 
-if st.button("Generate Learning Diagram"):
+        result = ask_gemini(prompt, DEBUG_MODE)
 
-    prompt = f"""
-    Explain the bug using ASCII diagrams.
+        st.session_state.output = f"""
+        # Bug Difficulty Score
 
-    Include:
-    - Program Flow
-    - Bug Location
-    - Wrong Flow
-    - Correct Flow
+        {result}
+        """
 
-    Code:
-    {code}
-    """
+with col6:
+    if st.button("Code Quality Score",use_container_width = True):
 
-    result = ask_gemini(prompt)
+        prompt = f"""
+        Analyze this code and give:
 
-    st.subheader("Visual Learning Diagram")
-    st.code(result)
+        1. Overall Score out of 100
+        2. Readability Score (/10)
+        3. Performance Score (/10)
+        4. Bug Risk Score (/10)
+        5. Best Practices Score (/10)
+
+        Also explain why each score was given.
+
+        Code:
+        {code}
+            """
+
+        result = ask_gemini(prompt, DEBUG_MODE)
+
+        st.session_state.output = f"""
+        # Code Quality Report
+
+        {result}
+        """
+
+st.divider()
+
+with st.container(border=True):
+
+    st.subheader("Output Panel")
+
+    if st.session_state.output:
+        st.markdown(st.session_state.output)
+
+    else:
+        st.info("Select any feature to analyze the code.")
